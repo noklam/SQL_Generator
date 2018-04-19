@@ -1,6 +1,9 @@
-
+# Brian Ray <brianhray@gmail.com>
+# @brianray
+# https://medium.com/@brianray_7981/
+# parser for POSH Syntax http://brianray.github.io/posh-syntax/
 import re
-import pdb
+
 
 def transition_skip(fsm_obj):
     pass
@@ -72,26 +75,48 @@ FSM_MAP = (
     #  {'src':, 'dst':, 'condition':, 'callback': },
     {'src': S_NEW_GROUP,
         'dst': S_PRE,
-        'condition': r"\b(select)\b",
+        'condition': "[A-Za-z|+|-|\d]",
         'callback': T_APPEND_CHAR_PRE},  # 1
     {'src': S_PRE,
-        'dst': S_SUBJ,
-        'condition': r"[A-Za-z]+",
+        'dst': S_PRE,
+        'condition': "[A-Za-z|+|-|\d]",
         'callback': T_APPEND_CHAR_PRE},  # 2
+    {'src': S_PRE,
+        'dst': S_SUBJ,
+        'condition': "\(",
+        'callback': T_SKIP},  # 3
+    {'src': S_SUBJ,
+        'dst': S_SUBJ,
+        'condition': "[^\)]",
+        'callback': T_APPEND_CHAR_SUBJ},  # 4
     {'src': S_SUBJ,
         'dst': S_END_RULE,
-        'condition': r"\b(from)\b",
-        'callback': T_APPEND_CHAR_PRE},  # 3
-    #  {'src': S_END_RULE,
-    #     'dst': S_OP,
-    #     'condition': r"[A-Za-z]+",
-    #     'callback': T_APPEND_CHAR_PRE},  # 4
+        'condition': "\)",
+        'callback': T_END_RULE},  # 5
     {'src': S_END_RULE,
+        'dst': S_END_GROUP,
+        'condition': "\)",
+        'callback': T_END_GROUP},  # 6
+    {'src': S_END_RULE,
+        'dst': S_OP,
+        'condition': "[\&|\|]",
+        'callback': T_ADD_OP_NEW_RULE},  # 7
+    {'src': S_END_GROUP,
+        'dst': S_OP,
+        'condition': "[\&|\|]",
+        'callback': T_ADD_GROUP_OP},  # 8
+    {'src': S_OP,
         'dst': S_NEW_GROUP,
-        'condition': r"[A-Za-z]+",
-        'callback': T_SKIP} ) # 4    
-
-
+        'condition': "\(",
+        'callback': T_NEW_GROUP},  # 9
+    {'src': S_OP,
+        'dst': S_PRE,
+        'condition': "[A-Za-z|+|-|\d]",
+        'callback': T_APPEND_CHAR_PRE},  # 10
+    {'src': S_SUBJ,
+        'dst': S_END_RULE,
+        'condition': "\)",
+        'callback': T_END_RULE})  # 11
 
 
 for map_item in FSM_MAP:
@@ -139,7 +164,6 @@ class Rule_Parse_FSM:
     def process_next(self, achar):
         self.current_char = achar
         frozen_state = self.current_state
-        # pdb.set_trace()
         for transition in FSM_MAP:
             if transition['src'] == frozen_state:
                 if self.iterate_re_evaluators(achar, transition):
@@ -148,7 +172,6 @@ class Rule_Parse_FSM:
 
     def iterate_re_evaluators(self, achar, transition):
         condition = transition['condition_re_compiled']
-        # pdb.set_trace()
         if condition.match(achar):
             self.update_state(
                 transition['dst'], transition['callback'])
@@ -163,15 +186,7 @@ class Rule_Parse_FSM:
         callback(self)
 
 
-example1 = "select column random string wrong from table random string"
-example2 = "select column random string wrong from table , random string"
-example3 = "select column random string wrong from table , random string"
-fsm1 = Rule_Parse_FSM(example1.split())
-fsm1.run()
-# fsm2 = Rule_Parse_FSM(example2.split())
-# fsm2.run()
-# fsm3 = Rule_Parse_FSM(example3.split())
-# fsm3.run()
-print(fsm1.current_group)
-# print(fsm2.current_group)
-# print(fsm3.current_group)
+example = "!AN(hellod) & AN(world )  "
+fsm = Rule_Parse_FSM(example)
+fsm.run()
+print(fsm.current_group)
